@@ -1,0 +1,21 @@
+
+volumes:
+  pg-data:
+
+services:
+  database:
+    image: postgres:18.3
+    volumes:
+      - pg-data:/var/lib/postgresql/18/data
+    environment:
+      - POSTGRES_USER=note
+      - POSTGRES_PASSWORD=note
+      - POSTGRES_DATABASE=note
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - 6432:5432
+    dns:
+      - 8.8.8.8
+
+  sqldef:
+    image: sqldef/psqldef
