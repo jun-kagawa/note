@@ -7,6 +7,7 @@ services:
     image: postgres:18.3
     volumes:
       - pg-data:/var/lib/postgresql/18/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       - POSTGRES_USER=note
       - POSTGRES_PASSWORD=note
