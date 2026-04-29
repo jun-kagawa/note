@@ -4,103 +4,123 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
-
 	note "github.com/jun-kagawa/note/api"
 )
 
-func v7() uuid.UUID {
-	id, _ := uuid.NewV7()
-	return id
-}
-
 func TestNoteRepository(t *testing.T) {
-	conn := openDB()
+	conn := setupDB(t)
 	repo := note.NewNoteRepository(conn)
-	user := note.NewUser()
-	note.NewUserRepository(conn).Save(context.Background(), user)
+	userRepo := note.NewUserRepository(conn)
+	ctx := context.Background()
 
-	t.Run("save note", func(t *testing.T) {
-		ctx := context.Background()
-		note := note.NewNote(user.ID, "test title", "test body")
-		err := repo.Save(ctx, note)
-		if err != nil {
-			t.Errorf("failed save note. err: %v", err)
+	// Helper to create a user for testing notes
+	setupUser := func(t *testing.T) *note.User {
+		t.Helper()
+		user := note.NewUser()
+		if err := userRepo.Save(ctx, user); err != nil {
+			t.Fatalf("failed to setup user: %v", err)
+		}
+		return user
+	}
+
+	t.Run("save and find note", func(t *testing.T) {
+		user := setupUser(t)
+		n := note.NewNote(user.ID, "test title", "test body")
+
+		if err := repo.Save(ctx, n); err != nil {
+			t.Fatalf("failed to save note: %v", err)
 		}
 
-		foundNote, err := repo.Find(ctx, note.ID)
+		found, err := repo.Find(ctx, n.ID)
 		if err != nil {
-			t.Errorf("failed find note. id: %v", note.ID)
+			t.Fatalf("failed to find note: %v", err)
 		}
-		if note.Title != foundNote.Title || note.Body != foundNote.Body {
-			t.Errorf("expect same struct. note: %v, found: %v", note, foundNote)
+
+		if found.Title != n.Title {
+			t.Errorf("got title %q, want %q", found.Title, n.Title)
+		}
+		if found.Body != n.Body {
+			t.Errorf("got body %q, want %q", found.Body, n.Body)
+		}
+		if found.UserID != n.UserID {
+			t.Errorf("got user ID %v, want %v", found.UserID, n.UserID)
 		}
 	})
 
 	t.Run("update note", func(t *testing.T) {
-		ctx := context.Background()
-		note := note.NewNote(user.ID, "test title", "test body")
-		err := repo.Save(ctx, note)
-		if err != nil {
-			t.Errorf("failed save note. err: %v", err)
-		}
-		note.Title = "updated title"
-		note.Body = "updated body"
-
-		err = repo.Save(ctx, note)
-		if err != nil {
-			t.Errorf("failed save note. err: %v", err)
+		user := setupUser(t)
+		n := note.NewNote(user.ID, "original title", "original body")
+		if err := repo.Save(ctx, n); err != nil {
+			t.Fatalf("failed to save note: %v", err)
 		}
 
-		foundNote, err := repo.Find(ctx, note.ID)
-		if err != nil {
-			t.Errorf("failed find note. id: %v", note.ID)
+		n.Title = "updated title"
+		n.Body = "updated body"
+		if err := repo.Save(ctx, n); err != nil {
+			t.Fatalf("failed to update note: %v", err)
 		}
-		if note.Title != foundNote.Title || note.Body != foundNote.Body {
-			t.Errorf("expect same struct. note: %v, found: %v", note, foundNote)
+
+		found, err := repo.Find(ctx, n.ID)
+		if err != nil {
+			t.Fatalf("failed to find note: %v", err)
+		}
+
+		if found.Title != "updated title" {
+			t.Errorf("got title %q, want %q", found.Title, "updated title")
+		}
+		if found.Body != "updated body" {
+			t.Errorf("got body %q, want %q", found.Body, "updated body")
 		}
 	})
 
 	t.Run("delete note", func(t *testing.T) {
-		ctx := context.Background()
-		note := note.NewNote(user.ID, "test title", "test body")
-		err := repo.Save(ctx, note)
-		if err != nil {
-			t.Errorf("failed save note. err: %v", err)
+		user := setupUser(t)
+		n := note.NewNote(user.ID, "to be deleted", "...")
+		if err := repo.Save(ctx, n); err != nil {
+			t.Fatalf("failed to save note: %v", err)
 		}
 
-		err = repo.Delete(ctx, note.ID)
-		if err != nil {
-			t.Errorf("failed delete note. err: %v", err)
+		if err := repo.Delete(ctx, n.ID); err != nil {
+			t.Fatalf("failed to delete note: %v", err)
 		}
 
-		note, err = repo.Find(ctx, note.ID)
-		if note != nil {
-			t.Errorf("expected note is nil.")
+		found, err := repo.Find(ctx, n.ID)
+		if err == nil {
+			t.Error("expected error when finding deleted note, but got nil")
+		}
+		if found != nil {
+			t.Errorf("expected note to be nil after deletion, but got %v", found)
 		}
 	})
 
-	t.Run("get note list items", func(t *testing.T) {
-		user := note.NewUser()
-		note.NewUserRepository(conn).Save(context.Background(), user)
-		ctx := context.Background()
-		n := note.NewNote(user.ID, "test title", "test body")
-		err := repo.Save(ctx, n)
-		if err != nil {
-			t.Errorf("failed save note. err: %v", err)
+	t.Run("list notes by user ID", func(t *testing.T) {
+		user := setupUser(t)
+		notes := []*note.Note{
+			note.NewNote(user.ID, "note 1", "body 1"),
+			note.NewNote(user.ID, "note 2", "body 2"),
 		}
-		n = note.NewNote(user.ID, "second title", "second body")
-		err = repo.Save(ctx, n)
-		if err != nil {
-			t.Errorf("failed save note. err: %v", err)
+
+		for _, n := range notes {
+			if err := repo.Save(ctx, n); err != nil {
+				t.Fatalf("failed to save note: %v", err)
+			}
 		}
 
 		items, err := repo.ListByUserID(ctx, user.ID)
 		if err != nil {
-			t.Errorf("failed list by user id. err: %v", err)
+			t.Fatalf("failed to list notes: %v", err)
 		}
-		if items[0].Title != "second title" || items[1].Title != "test title" {
-			t.Errorf("failed. err: %v", items)
+
+		if len(items) != len(notes) {
+			t.Fatalf("got %d items, want %d", len(items), len(notes) )
+		}
+
+		// Items should be ordered by CreatedAt DESC
+		if items[0].Title != "note 2" {
+			t.Errorf("got first item title %q, want %q", items[0].Title, "note 2")
+		}
+		if items[1].Title != "note 1" {
+			t.Errorf("got second item title %q, want %q", items[1].Title, "note 1")
 		}
 	})
 }
