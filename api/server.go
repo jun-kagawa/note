@@ -3,18 +3,21 @@ package note
 import (
 	"log/slog"
 	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func SetupServeMux(conn *pgxpool.Pool) *http.ServeMux {
+	userRepository := NewUserRepository(conn)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /users", CreateUserHandler(userRepository))
+	return mux
+}
 
 func RunServer() {
 	conn, _ := SetupDB("postgresql://note:note@localhost:6432/note")
-	userRepository := NewUserRepository(conn)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
-	})
-	mux.HandleFunc("POST /users", createUserHandler(userRepository))
-
+	mux := SetupServeMux(conn)
 	srv := http.Server{
 		Addr:    ":8080",
 		Handler: mux,
