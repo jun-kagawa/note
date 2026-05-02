@@ -10,7 +10,7 @@ import (
 )
 
 func TestUserRepository(t *testing.T) {
-	conn := setupDB(t)
+	conn := setupTestDB(t)
 	repo := note.NewUserRepository(conn)
 	ctx := context.Background()
 

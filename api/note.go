@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Note struct {
@@ -48,10 +49,10 @@ type NoteListItem struct {
 }
 
 type NoteRepository struct {
-	conn *pgx.Conn
+	conn *pgxpool.Pool
 }
 
-func NewNoteRepository(conn *pgx.Conn) *NoteRepository {
+func NewNoteRepository(conn *pgxpool.Pool) *NoteRepository {
 	return &NoteRepository{
 		conn: conn,
 	}

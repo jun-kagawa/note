@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type User struct {
@@ -22,10 +22,10 @@ func NewUser() *User {
 }
 
 type UserRepository struct {
-	conn *pgx.Conn
+	conn *pgxpool.Pool
 }
 
-func NewUserRepository(conn *pgx.Conn) *UserRepository {
+func NewUserRepository(conn *pgxpool.Pool) *UserRepository {
 	return &UserRepository{
 		conn: conn,
 	}
