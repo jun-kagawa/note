@@ -42,17 +42,13 @@ func (h *NoteHandler) GetNoteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	note, err := h.noteRepository.Find(ctx, noteID)
+	note, err := h.noteRepository.Find(ctx, noteID, user.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httpError(w, http.StatusNotFound)
 		} else {
 			httpError(w, http.StatusInternalServerError)
 		}
-		return
-	}
-	if note.UserID != user.ID {
-		httpError(w, http.StatusForbidden)
 		return
 	}
 	body, err := json.Marshal(note)
