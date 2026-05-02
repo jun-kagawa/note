@@ -1,24 +1,16 @@
 package note_test
 
 import (
-	"context"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	note "github.com/jun-kagawa/note/api"
 )
 
-func setupDB(t *testing.T) *pgx.Conn {
+func setupTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgresql://note:note@localhost:6432/note_test")
-	if err != nil {
-		t.Fatalf("failed to connect to database: %v", err)
-	}
-	if err := conn.Ping(ctx); err != nil {
-		t.Fatalf("failed to ping database: %v", err)
-	}
-	t.Cleanup(func() {
-		conn.Close(ctx)
-	})
+	dsn := "postgresql://note:note@localhost:6432/note_test"
+	conn, f := note.SetupDB(dsn)
+	t.Cleanup(f)
 	return conn
 }

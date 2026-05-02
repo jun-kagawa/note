@@ -10,7 +10,10 @@ apply-schema:
 	cat schema.sql | $(SQLDEF_CMD) note
 	cat schema.sql | $(SQLDEF_CMD) note_test
 
+setup:
+	docker compose up -d | sleep 3
+
 fmt:
 	go fmt ./...
-test:
+test: setup
 	go test ./...

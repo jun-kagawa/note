@@ -8,7 +8,7 @@ import (
 )
 
 func TestNoteRepository(t *testing.T) {
-	conn := setupDB(t)
+	conn := setupTestDB(t)
 	repo := note.NewNoteRepository(conn)
 	userRepo := note.NewUserRepository(conn)
 	ctx := context.Background()
@@ -112,7 +112,7 @@ func TestNoteRepository(t *testing.T) {
 		}
 
 		if len(items) != len(notes) {
-			t.Fatalf("got %d items, want %d", len(items), len(notes) )
+			t.Fatalf("got %d items, want %d", len(items), len(notes))
 		}
 
 		// Items should be ordered by CreatedAt DESC
