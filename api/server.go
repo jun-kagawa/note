@@ -9,9 +9,18 @@ import (
 
 func SetupServeMux(conn *pgxpool.Pool) *http.ServeMux {
 	userRepository := NewUserRepository(conn)
+	noteRepository := NewNoteRepository(conn)
+
+	noteHandler := NewNoteHandler(userRepository, noteRepository)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", CreateUserHandler(userRepository))
+	mux.Handle("GET /notes/{id}", AuthMiddleware(http.HandlerFunc(noteHandler.GetNoteHandler)))
 	return mux
+}
+
+func httpError(w http.ResponseWriter, code int) {
+	http.Error(w, http.StatusText(code), code)
 }
 
 func RunServer() {
