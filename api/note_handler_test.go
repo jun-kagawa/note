@@ -102,8 +102,8 @@ func TestGetNoteHandler(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.GetNoteHandler(rec, req)
 
-		if rec.Code != http.StatusForbidden {
-			t.Errorf("expected status 403, got %d", rec.Code)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected status 404, got %d", rec.Code)
 		}
 	})
 

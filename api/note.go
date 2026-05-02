@@ -42,10 +42,10 @@ func WithID(ID uuid.UUID) NoteOption {
 }
 
 type NoteListItem struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Title     string
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type NoteRepository struct {
@@ -64,10 +64,10 @@ func (r *NoteRepository) Save(ctx context.Context, note *Note) error {
 	return err
 }
 
-func (r *NoteRepository) Find(ctx context.Context, ID uuid.UUID) (*Note, error) {
-	stmt := "SELECT id, user_id, title, body, created_at FROM notes WHERE id = $1"
+func (r *NoteRepository) Find(ctx context.Context, ID uuid.UUID, userID uuid.UUID) (*Note, error) {
+	stmt := "SELECT id, user_id, title, body, created_at FROM notes WHERE id = $1 and user_id = $2"
 	var note Note
-	err := r.conn.QueryRow(ctx, stmt, ID).
+	err := r.conn.QueryRow(ctx, stmt, ID, userID).
 		Scan(&note.ID, &note.UserID, &note.Title, &note.Body, &note.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -75,20 +75,19 @@ func (r *NoteRepository) Find(ctx context.Context, ID uuid.UUID) (*Note, error) 
 	return &note, err
 }
 
-func (r *NoteRepository) Delete(ctx context.Context, ID uuid.UUID) error {
-	stmt := "DELETE FROM notes WHERE id = $1"
-	_, err := r.conn.Exec(ctx, stmt, ID)
+func (r *NoteRepository) Delete(ctx context.Context, ID uuid.UUID, userID uuid.UUID) error {
+	stmt := "DELETE FROM notes WHERE id = $1 and user_id = $2"
+	_, err := r.conn.Exec(ctx, stmt, ID, userID)
 	return err
 }
 
 func (r *NoteRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]NoteListItem, error) {
-	limit := 10
-	stmt := "SELECT id, user_id, title, created_at FROM notes WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2"
-	rows, err := r.conn.Query(ctx, stmt, userID, limit)
+	stmt := "SELECT id, user_id, title, created_at FROM notes WHERE user_id = $1 ORDER BY created_at DESC"
+	rows, err := r.conn.Query(ctx, stmt, userID)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]NoteListItem, 0, limit)
+	items := make([]NoteListItem, 0, 10)
 	var id, userId uuid.UUID
 	var title string
 	var createdAt time.Time

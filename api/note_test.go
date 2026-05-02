@@ -31,7 +31,7 @@ func TestNoteRepository(t *testing.T) {
 			t.Fatalf("failed to save note: %v", err)
 		}
 
-		found, err := repo.Find(ctx, n.ID)
+		found, err := repo.Find(ctx, n.ID, user.ID)
 		if err != nil {
 			t.Fatalf("failed to find note: %v", err)
 		}
@@ -60,7 +60,7 @@ func TestNoteRepository(t *testing.T) {
 			t.Fatalf("failed to update note: %v", err)
 		}
 
-		found, err := repo.Find(ctx, n.ID)
+		found, err := repo.Find(ctx, n.ID, user.ID)
 		if err != nil {
 			t.Fatalf("failed to find note: %v", err)
 		}
@@ -80,11 +80,11 @@ func TestNoteRepository(t *testing.T) {
 			t.Fatalf("failed to save note: %v", err)
 		}
 
-		if err := repo.Delete(ctx, n.ID); err != nil {
+		if err := repo.Delete(ctx, n.ID, user.ID); err != nil {
 			t.Fatalf("failed to delete note: %v", err)
 		}
 
-		found, err := repo.Find(ctx, n.ID)
+		found, err := repo.Find(ctx, n.ID, user.ID)
 		if err == nil {
 			t.Error("expected error when finding deleted note, but got nil")
 		}
