@@ -10,11 +10,11 @@ import (
 )
 
 type Note struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Title     string
-	Body      string
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type NoteOption func(*Note) *Note
