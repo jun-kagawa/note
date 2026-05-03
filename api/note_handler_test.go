@@ -141,3 +141,85 @@ func TestGetNoteHandler(t *testing.T) {
 		}
 	})
 }
+
+func TestGetNoteItemHandler(t *testing.T) {
+	conn := setupTestDB(t)
+	userRepo := note.NewUserRepository(conn)
+	noteRepo := note.NewNoteRepository(conn)
+	mux := note.SetupServeMux(conn)
+
+	ctx := context.Background()
+	user := note.NewUser()
+	if err := userRepo.Save(ctx, user); err != nil {
+		t.Fatalf("failed to save user: %v", err)
+	}
+
+	notes := []note.Note{
+		*note.NewNote(user.ID, "Note 1", "Body 1"),
+		*note.NewNote(user.ID, "Note 2", "Body 2"),
+	}
+	for i := range notes {
+		if err := noteRepo.Save(ctx, &notes[i]); err != nil {
+			t.Fatalf("failed to save note %d: %v", i, err)
+		}
+	}
+
+	t.Run("success", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/notes", nil)
+		req.AddCookie(&http.Cookie{Name: "user_id", Value: user.ID.String()})
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		var got []note.Note
+		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		if len(got) != len(notes) {
+			t.Errorf("got %d notes, want %d", len(got), len(notes))
+		}
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		userWithoutNotes := note.NewUser()
+		if err := userRepo.Save(ctx, userWithoutNotes); err != nil {
+			t.Fatalf("failed to save user: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/notes", nil)
+		req.AddCookie(&http.Cookie{Name: "user_id", Value: userWithoutNotes.ID.String()})
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		var got []note.Note
+		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		if len(got) != 0 {
+			t.Errorf("got %d notes, want 0", len(got))
+		}
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/notes", nil)
+		// No user_id cookie
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+	})
+}
