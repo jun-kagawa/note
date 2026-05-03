@@ -23,7 +23,7 @@ func NewNoteHandler(userRepository *UserRepository, noteRepository *NoteReposito
 	}
 }
 
-func (h *NoteHandler) GetNoteHandler(w http.ResponseWriter, r *http.Request) {
+func (h *NoteHandler) GetNote(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	noteID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -52,7 +52,7 @@ func (h *NoteHandler) GetNoteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-func (h *NoteHandler) GetNoteItemHandler(w http.ResponseWriter, r *http.Request) {
+func (h *NoteHandler) GetNoteItems(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, err := h.currentUser(ctx)
 	if err != nil {
@@ -78,7 +78,7 @@ type UpsertNoteDTO struct {
 	Body  string `json:"body"`
 }
 
-func (h *NoteHandler) UpsertNoteHandler(w http.ResponseWriter, r *http.Request) {
+func (h *NoteHandler) UpsertNote(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, err := h.currentUser(ctx)
 	if err != nil {
@@ -122,6 +122,10 @@ func (h *NoteHandler) UpsertNoteHandler(w http.ResponseWriter, r *http.Request) 
 		httpError(w, http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h *NoteHandler) DeleteNote(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func (h *NoteHandler) currentUser(ctx context.Context) (*User, error) {

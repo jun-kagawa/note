@@ -15,9 +15,9 @@ func SetupServeMux(conn *pgxpool.Pool) *http.ServeMux {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", CreateUserHandler(userRepository))
-	mux.Handle("GET /notes/{id}", AuthMiddleware(http.HandlerFunc(noteHandler.GetNoteHandler)))
-	mux.Handle("GET /notes", AuthMiddleware(http.HandlerFunc(noteHandler.GetNoteItemHandler)))
-	mux.Handle("POST /notes", AuthMiddleware(http.HandlerFunc(noteHandler.UpsertNoteHandler)))
+	mux.Handle("GET /notes/{id}", AuthMiddleware(http.HandlerFunc(noteHandler.GetNote)))
+	mux.Handle("GET /notes", AuthMiddleware(http.HandlerFunc(noteHandler.GetNoteItems)))
+	mux.Handle("POST /notes", AuthMiddleware(http.HandlerFunc(noteHandler.UpsertNote)))
 	return mux
 }
 
