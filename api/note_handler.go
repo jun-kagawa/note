@@ -1,6 +1,7 @@
 package note
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -23,23 +24,14 @@ func NewNoteHandler(userRepository *UserRepository, noteRepository *NoteReposito
 
 func (h *NoteHandler) GetNoteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, err := GetUserID(ctx)
-	if err != nil {
-		httpError(w, http.StatusUnauthorized)
-		return
-	}
 	noteID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		httpError(w, http.StatusBadRequest)
 		return
 	}
-	user, err := h.userRepository.Find(ctx, userID)
+	user, err := h.currentUser(ctx)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			httpError(w, http.StatusNotFound)
-		} else {
-			httpError(w, http.StatusInternalServerError)
-		}
+		httpError(w, http.StatusUnauthorized)
 		return
 	}
 	note, err := h.noteRepository.Find(ctx, noteID, user.ID)
@@ -59,10 +51,34 @@ func (h *NoteHandler) GetNoteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-func GetNoteItemHandler(w http.ResponseWriter, r *http.Request) {
-
+func (h *NoteHandler) GetNoteItemHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user, err := h.currentUser(ctx)
+	if err != nil {
+		httpError(w, http.StatusUnauthorized)
+		return
+	}
+	noteItems, err := h.noteRepository.ListByUserID(ctx, user.ID)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError)
+		return
+	}
+	body, err := json.Marshal(noteItems)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError)
+		return
+	}
+	w.Write(body)
 }
 
 func UpsertNotHandler(w http.ResponseWriter, r *http.Request) {
 
+}
+
+func (h *NoteHandler) currentUser(ctx context.Context) (*User, error) {
+	userID, err := GetUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return h.userRepository.Find(ctx, userID)
 }
