@@ -1,10 +1,12 @@
 package note_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -220,6 +222,125 @@ func TestGetNoteItemHandler(t *testing.T) {
 
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+	})
+}
+
+func TestUpsertNoteHandler(t *testing.T) {
+	conn := setupTestDB(t)
+	userRepo := note.NewUserRepository(conn)
+	noteRepo := note.NewNoteRepository(conn)
+	handler := note.NewNoteHandler(userRepo, noteRepo)
+
+	ctx := context.Background()
+	user := note.NewUser()
+	if err := userRepo.Save(ctx, user); err != nil {
+		t.Fatalf("failed to save user: %v", err)
+	}
+
+	t.Run("success create", func(t *testing.T) {
+		dto := note.UpsertNoteDTO{
+			Title: "New Note",
+			Body:  "New Body",
+		}
+		body, _ := json.Marshal(dto)
+		req := httptest.NewRequest(http.MethodPost, "/notes", bytes.NewReader(body))
+		req = req.WithContext(note.SetUserID(req.Context(), user.ID))
+
+		rec := httptest.NewRecorder()
+		handler.UpsertNoteHandler(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		// Verify note was created
+		notes, err := noteRepo.ListByUserID(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("failed to list notes: %v", err)
+		}
+		if len(notes) != 1 {
+			t.Errorf("got %d notes, want 1", len(notes))
+		}
+		if notes[0].Title != dto.Title {
+			t.Errorf("got title %q, want %q", notes[0].Title, dto.Title)
+		}
+	})
+
+	t.Run("success update", func(t *testing.T) {
+		n := note.NewNote(user.ID, "Old Title", "Old Body")
+		if err := noteRepo.Save(ctx, n); err != nil {
+			t.Fatalf("failed to save note: %v", err)
+		}
+
+		dto := note.UpsertNoteDTO{
+			ID:    n.ID.String(),
+			Title: "Updated Title",
+			Body:  "Updated Body",
+		}
+		body, _ := json.Marshal(dto)
+		req := httptest.NewRequest(http.MethodPost, "/notes", bytes.NewReader(body))
+		req = req.WithContext(note.SetUserID(req.Context(), user.ID))
+
+		rec := httptest.NewRecorder()
+		handler.UpsertNoteHandler(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		// Verify note was updated
+		updated, err := noteRepo.Find(ctx, n.ID, user.ID)
+		if err != nil {
+			t.Fatalf("failed to find note: %v", err)
+		}
+		if updated.Title != dto.Title {
+			t.Errorf("got title %q, want %q", updated.Title, dto.Title)
+		}
+		if updated.Body != dto.Body {
+			t.Errorf("got body %q, want %q", updated.Body, dto.Body)
+		}
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/notes", nil)
+		// No user ID in context
+
+		rec := httptest.NewRecorder()
+		handler.UpsertNoteHandler(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid json", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/notes", strings.NewReader("{invalid}"))
+		req = req.WithContext(note.SetUserID(req.Context(), user.ID))
+
+		rec := httptest.NewRecorder()
+		handler.UpsertNoteHandler(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("update non-existent note", func(t *testing.T) {
+		dto := note.UpsertNoteDTO{
+			ID:    uuid.New().String(),
+			Title: "Title",
+			Body:  "Body",
+		}
+		body, _ := json.Marshal(dto)
+		req := httptest.NewRequest(http.MethodPost, "/notes", bytes.NewReader(body))
+		req = req.WithContext(note.SetUserID(req.Context(), user.ID))
+
+		rec := httptest.NewRecorder()
+		handler.UpsertNoteHandler(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected status 404, got %d", rec.Code)
 		}
 	})
 }

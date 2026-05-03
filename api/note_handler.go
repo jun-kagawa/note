@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -71,8 +72,56 @@ func (h *NoteHandler) GetNoteItemHandler(w http.ResponseWriter, r *http.Request)
 	w.Write(body)
 }
 
-func UpsertNotHandler(w http.ResponseWriter, r *http.Request) {
+type UpsertNoteDTO struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
 
+func (h *NoteHandler) UpsertNoteHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user, err := h.currentUser(ctx)
+	if err != nil {
+		httpError(w, http.StatusUnauthorized)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+	var dto UpsertNoteDTO
+	if err := json.Unmarshal(body, &dto); err != nil {
+		httpError(w, http.StatusBadRequest)
+		return
+	}
+	var note *Note
+	if dto.ID == "" {
+		note = NewNote(user.ID, dto.Title, dto.Body)
+	} else {
+		id, err := uuid.Parse(dto.ID)
+		if err != nil {
+			httpError(w, http.StatusBadRequest)
+			return
+		}
+		note, err = h.noteRepository.Find(ctx, id, user.ID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httpError(w, http.StatusNotFound)
+			} else {
+				httpError(w, http.StatusInternalServerError)
+			}
+			return
+		}
+		note.Title = dto.Title
+		note.Body = dto.Body
+	}
+
+	if err := h.noteRepository.Save(ctx, note); err != nil {
+		httpError(w, http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *NoteHandler) currentUser(ctx context.Context) (*User, error) {
