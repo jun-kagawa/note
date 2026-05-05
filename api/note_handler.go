@@ -125,7 +125,21 @@ func (h *NoteHandler) UpsertNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *NoteHandler) DeleteNote(w http.ResponseWriter, r *http.Request) {
-
+	ctx := r.Context()
+	user, err := h.currentUser(ctx)
+	if err != nil {
+		httpError(w, http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		httpError(w, http.StatusBadRequest)
+		return
+	}
+	if err := h.noteRepository.Delete(ctx, id, user.ID); err != nil {
+		httpError(w, http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *NoteHandler) currentUser(ctx context.Context) (*User, error) {
