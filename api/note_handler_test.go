@@ -315,3 +315,97 @@ func TestUpsertNoteHandler(t *testing.T) {
 		}
 	})
 }
+
+func TestDeleteNoteHandler(t *testing.T) {
+	conn := setupTestDB(t)
+	userRepo := note.NewUserRepository(conn)
+	noteRepo := note.NewNoteRepository(conn)
+	mux := note.SetupServeMux(conn)
+
+	ctx := context.Background()
+	user := note.NewUser()
+	if err := userRepo.Save(ctx, user); err != nil {
+		t.Fatalf("failed to save user: %v", err)
+	}
+
+	t.Run("success", func(t *testing.T) {
+		n := note.NewNote(user.ID, "Title", "Body")
+		if err := noteRepo.Save(ctx, n); err != nil {
+			t.Fatalf("failed to save note: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/notes/"+n.ID.String(), nil)
+		req.AddCookie(&http.Cookie{Name: "user_id", Value: user.ID.String()})
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		// Verify note is deleted
+		found, err := noteRepo.Find(ctx, n.ID, user.ID)
+		if err == nil {
+			t.Error("expected error when finding deleted note, but got nil")
+		}
+		if found != nil {
+			t.Errorf("expected note to be nil, got %v", found)
+		}
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/notes/"+uuid.New().String(), nil)
+		// No user_id cookie
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/notes/invalid-uuid", nil)
+		req.AddCookie(&http.Cookie{Name: "user_id", Value: user.ID.String()})
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("other user's note", func(t *testing.T) {
+		otherUser := note.NewUser()
+		if err := userRepo.Save(ctx, otherUser); err != nil {
+			t.Fatalf("failed to save other user: %v", err)
+		}
+		otherNote := note.NewNote(otherUser.ID, "Other Title", "Other Body")
+		if err := noteRepo.Save(ctx, otherNote); err != nil {
+			t.Fatalf("failed to save other note: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/notes/"+otherNote.ID.String(), nil)
+		req.AddCookie(&http.Cookie{Name: "user_id", Value: user.ID.String()})
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		// Current implementation returns 200 OK even if no rows were deleted
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		// Verify other user's note is NOT deleted
+		found, err := noteRepo.Find(ctx, otherNote.ID, otherUser.ID)
+		if err != nil {
+			t.Fatalf("expected other user's note to still exist, but got error: %v", err)
+		}
+		if found == nil {
+			t.Error("expected other user's note to still exist, but got nil")
+		}
+	})
+}
